@@ -1,12 +1,8 @@
 const client = require('./pgClient.js');
 
 module.exports = {
-  getReview: async function(id, page, count, sort) {
-
+  getReviews: async function(id, page = 1, count = 5, sort = 'relevant') {
     let product_id = id;
-    page = page ? page : 1;
-    count = count ? count : 5;
-    sort = sort ? sort : 'relevant';
 
     let offset = (page * count) - count;
     let orderby = '';
@@ -21,10 +17,10 @@ module.exports = {
         orderby = 'date desc, helpfulness desc'
         break;
       default:
-        console.log('orderby is not one of the above choices');
         orderby = 'date desc, helpfulness desc'
         break;
     }
+
     const queryString = `SELECT * FROM reviews WHERE product_id = ${product_id} ORDER BY ${orderby} LIMIT ${count} OFFSET ${offset}`
     let reviews = client.query(queryString);
     return reviews;
@@ -38,7 +34,6 @@ module.exports = {
       recommended: {},
       characteristics: {}
     };
-
     return client.query(`SELECT recommend, COUNT(*) FROM reviews WHERE product_id = ${product_id} GROUP by recommend`)
       .then((res) => res.rows.forEach((obj) => {result.recommended[obj.recommend] = Number(obj.count)}))
       .then(() => {
@@ -72,33 +67,46 @@ module.exports = {
         'characteristics': obj.characteristics
       }
 
+      console.log('data', data);
+      console.log({obj});
+
     let product_id = data.product_id;
     let rating = data.rating;
     let summary = data.summary;
-    let body = data.body;
+    let body = JSON.stringify(data.body);
     let recommend = data.recommend;
     let reviewer_name = data.name;
     let reviewer_email = data.email;
     let photos = data.photos;
     let characteristics = data.characteristics;
     let date = new Date().toISOString().split('T')[0]; // today's date
+    let helpfulness = 0;
 
-    const queryString = `WITH reviews_added AS (
-                          INSERT INTO reviews(product_id, rating, date, summary, body, recommend, reviewer_name, reviewer_email)
-                          VALUES(product_id, rating, date, summary, body, recommend, reviewer_name, reviewer_email)
-                          RETURNING id AS review_id
-                        ),
-                        photos_added AS (
-                          INSERT INTO photos(review_id, url)
-                          VALUES ${photos.map((url) => (`(review_id, '${url}')`) ).join(', ')};
-                        )
-                        INSERT INTO reviews_characteristics(characteristic_id, review_id, value)
-                        VALUES ${Object.keys(characteristics).map((key) => (`(${key}, review_id, ${characteristics[key]})`) ).join(', ')}`;
-    let addReview = client.query(queryString);
-    return addReview;
+    const queryStringReviews = `INSERT INTO reviews(product_id, rating, date, summary, body, recommend, reviewer_name, reviewer_email, helpfulness)
+                          VALUES('${product_id}', '${rating}', '${date}', '${JSON.stringify(summary)}', '${body}', '${recommend}', '${reviewer_name}', '${reviewer_email}', '${helpfulness}')
+                          RETURNING id AS rev_id;`
+    return client.query(queryStringReviews)
+      .then((rev_id) => {
+        rev_id = Number(rev_id.rows[0].rev_id);
+        let value = photos.map((url) =>
+          `('${rev_id}','${url}')`)
+        const queryStringPhotos = `INSERT INTO photos(review_id, url)
+                          VALUES ${value}
+                          RETURNING review_id AS rev_id;`
+        return client.query(queryStringPhotos)
+      })
+      .then((rev_id) => {
+        rev_id = rev_id.rows[0].rev_id;
+        let value = Object.values(characteristics).map((char) =>
+          `('${char.id}','${rev_id}', '${char.value}')`)
+
+        const queryStringCharacteristics =  `INSERT INTO reviews_characteristics(characteristic_id, review_id, value)
+                            VALUES ${value};`
+        return client.query(queryStringCharacteristics)
+      })
   },
 
-  markRHelpful: function(r_id) {
+  markHelpful: function(r_id) {
     let review_id = r_id;
     const queryString = `UPDATE reviews SET helpfulness = helpfulness + 1 WHERE id = ${review_id}`;
     let helpful = client.query(queryString);

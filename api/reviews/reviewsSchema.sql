@@ -12,14 +12,13 @@ DROP TABLE IF EXISTS reviews CASCADE;
 DROP TABLE IF EXISTS reviews_characteristics CASCADE;
 
 CREATE TABLE product_characteristics (
-  id INT,
+  id SERIAL PRIMARY KEY,
   product_id INT,
-  name TEXT,
-  PRIMARY KEY(id)
+  name TEXT
 );
 
 CREATE TABLE reviews (
-  id INT GENERATED ALWAYS AS IDENTITY,
+  id SERIAL PRIMARY KEY,
   product_id INT NOT NULL,
   rating INT,
   date DATE,
@@ -30,25 +29,21 @@ CREATE TABLE reviews (
   reviewer_name TEXT,
   reviewer_email TEXT,
   response TEXT,
-  helpfulness INT NOT NULL,
-  PRIMARY KEY(id)
+  helpfulness INT NOT NULL
 );
 
 CREATE TABLE photos (
-  id INT,
+  id SERIAL PRIMARY KEY,
   review_id INT REFERENCES reviews(id),
-  url TEXT,
-  PRIMARY KEY(id)
+  url TEXT
 );
 
 CREATE TABLE reviews_characteristics (
-  id INT,
+  id SERIAL PRIMARY KEY,
   characteristic_id INT,
   review_id INT REFERENCES reviews(id),
-  value INT,
-  PRIMARY KEY(id)
+  value INT
 );
-
 
 COPY reviews(id, product_id, rating, date, summary, body, recommend, reported, reviewer_name, reviewer_email, response, helpfulness) FROM '/Users/Admin/Desktop/HackReactor/Frontend-Capstone-Ecommerce/api/reviews/CSV_Files/parsedReviews.csv' DELIMITER ',' CSV HEADER;
 
